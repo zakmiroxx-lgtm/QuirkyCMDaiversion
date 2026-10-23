@@ -3051,6 +3051,13 @@ end))
 
 --[[Command list with every description.]]--
 genv.cmdData = {
+    ["damage"] = "Deals a specified amount of damage.",
+    ["sethealth"] = "Sets a player's health.",
+    ["god"] = "Continuously restores health.",
+    ["ungod"] = "Disables god mode.",
+    ["refresh"] = "Respawns your character at the same position.",
+    ["infjump"] = "Enables infinite jumping.",
+    ["uninfjump"] = "Disables infinite jumping.",
     ["heal"] = "Restores player health to maximum.",
 	["admin"] = "Grants or removes admin permissions",
 	["aliases"] = "Prints all command aliases.",
@@ -6342,6 +6349,130 @@ table.insert(genv.connections, rs.Heartbeat:Connect(function(dt)
 end))
 
 --[[Sort commands alphabetically]]--
+-- =========================================
+-- QUIRKYCMD ULTIMATE COMMANDS V2
+-- =========================================
+
+local godConnections = {}
+local infiniteJumpEnabled = false
+
+addCommand("damage", function(plrs, input)
+    local args = input:split(" ")
+    local amount = tonumber(args[#args]) or 25
+
+    amount = math.max(0, amount)
+
+    for _, plr in ipairs(plrs) do
+        local char = plr.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+        if hum and hum.Health > 0 then
+            hum:TakeDamage(amount)
+        end
+    end
+end, {"dmg"}, 3)
+
+addCommand("sethealth", function(plrs, input)
+    local args = input:split(" ")
+    local amount = tonumber(args[#args])
+
+    if not amount then
+        notify("SetHealth", "Usage: ;sethealth me 50", 4)
+        return
+    end
+
+    for _, plr in ipairs(plrs) do
+        local char = plr.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+        if hum then
+            hum.Health = math.clamp(amount, 0, hum.MaxHealth)
+        end
+    end
+end, {"sethp"}, 3)
+
+addCommand("god", function(plrs)
+    for _, plr in ipairs(plrs) do
+        local char = plr.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+        if not hum then continue end
+
+        if godConnections[plr] then
+            godConnections[plr]:Disconnect()
+        end
+
+        hum.Health = hum.MaxHealth
+
+        godConnections[plr] = hum.HealthChanged:Connect(function()
+            if hum.Health > 0 and hum.Health < hum.MaxHealth then
+                hum.Health = hum.MaxHealth
+            end
+        end)
+
+        table.insert(genv.connections, godConnections[plr])
+    end
+end, {"godmode"}, 3)
+
+addCommand("ungod", function(plrs)
+    for _, plr in ipairs(plrs) do
+        if godConnections[plr] then
+            godConnections[plr]:Disconnect()
+            godConnections[plr] = nil
+        end
+    end
+end, {"ungodmode"}, 3)
+
+addCommand("refresh", function(plrs)
+    for _, plr in ipairs(plrs) do
+        if plr ~= localPlayer then continue end
+
+        local char = plr.Character
+        if not char then continue end
+
+        local oldPosition = char:GetPivot()
+
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum then continue end
+
+        hum.Health = 0
+
+        task.spawn(function()
+            local newChar = plr.CharacterAdded:Wait()
+            local hrp = newChar:WaitForChild("HumanoidRootPart", 10)
+
+            if hrp then
+                newChar:PivotTo(oldPosition)
+            end
+        end)
+    end
+end, {"refreshchar"}, 3)
+
+addCommand("infjump", function()
+    infiniteJumpEnabled = true
+end, {"infinitejump"}, 3)
+
+addCommand("uninfjump", function()
+    infiniteJumpEnabled = false
+end, {"uninfinitejump"}, 3)
+
+local infiniteJumpConnection = uis.JumpRequest:Connect(function()
+    if not infiniteJumpEnabled then return end
+
+    local char = localPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+    if hum and hum.Health > 0 then
+        hum:ChangeState(Enum.HumanoidStateType.Jumping)
+    end
+end)
+
+table.insert(genv.connections, infiniteJumpConnection)
+
+-- =========================================
+-- END OF ULTIMATE COMMANDS
+-- =========================================
+
 table.sort(commands, function(a,b)
 	return a.name < b.name
 end)
