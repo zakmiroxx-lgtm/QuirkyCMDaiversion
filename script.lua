@@ -1209,6 +1209,98 @@ UICorner_38.CornerRadius = UDim.new(0, 3)
 UICorner_38.Parent = remotepath
 
 -- END OF UI
+-- ==========================================
+-- QUIRKYCMD HIDE / SHOW BUTTON
+-- ==========================================
+
+local hideGui = Instance.new("ScreenGui")
+hideGui.Name = "QuirkyHideButton"
+hideGui.ResetOnSpawn = false
+hideGui.IgnoreGuiInset = true
+hideGui.Parent = gethui()
+
+local hideButton = Instance.new("TextButton")
+hideButton.Name = "ToggleQuirkyCMD"
+hideButton.Size = UDim2.new(0, 110, 0, 38)
+hideButton.Position = UDim2.new(1, -125, 0.5, -19)
+hideButton.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+hideButton.TextColor3 = Color3.fromRGB(255, 70, 70)
+hideButton.Text = "HIDE UI"
+hideButton.Font = Enum.Font.GothamBold
+hideButton.TextSize = 14
+hideButton.Parent = hideGui
+
+local hideCorner = Instance.new("UICorner")
+hideCorner.CornerRadius = UDim.new(0, 10)
+hideCorner.Parent = hideButton
+
+local hideStroke = Instance.new("UIStroke")
+hideStroke.Color = Color3.fromRGB(180, 0, 0)
+hideStroke.Thickness = 2
+hideStroke.Parent = hideButton
+
+local hideVisible = true
+
+hideButton.MouseButton1Click:Connect(function()
+    hideVisible = not hideVisible
+
+    quirkyCMD.Enabled = hideVisible
+
+    hideButton.Text = hideVisible and "HIDE UI" or "SHOW UI"
+
+    TweenService:Create(
+        hideButton,
+        TweenInfo.new(0.2),
+        {
+            BackgroundColor3 = hideVisible
+                and Color3.fromRGB(20, 20, 20)
+                or Color3.fromRGB(70, 0, 0)
+        }
+    ):Play()
+end)
+
+-- Dragging
+local hideDragging = false
+local hideDragStart
+local hideStartPosition
+
+hideButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        hideDragging = true
+        hideDragStart = input.Position
+        hideStartPosition = hideButton.Position
+
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then
+                hideDragging = false
+            end
+        end)
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if not hideDragging then return end
+
+    if input.UserInputType == Enum.UserInputType.MouseMovement
+        or input.UserInputType == Enum.UserInputType.Touch then
+
+        local delta = input.Position - hideDragStart
+
+        hideButton.Position = UDim2.new(
+            hideStartPosition.X.Scale,
+            hideStartPosition.X.Offset + delta.X,
+            hideStartPosition.Y.Scale,
+            hideStartPosition.Y.Offset + delta.Y
+        )
+    end
+end)
+
+-- ==========================================
+-- END HIDE / SHOW BUTTON
+-- ==========================================
+
 
 -- fix some properties which gui2lua does not export
 local function fixUI()
@@ -3051,6 +3143,9 @@ end))
 
 --[[Command list with every description.]]--
 genv.cmdData = {
+    ["sukunacut"] = "Gives a tool that launches a red cutting slash.",
+    ["sukunaworldcut"] = "Gives a powerful wide-range cutting slash.",
+    ["domainexpansion"] = "Creates a massive black sphere with red energy effects.",
     ["damage"] = "Deals a specified amount of damage.",
     ["sethealth"] = "Sets a player's health.",
     ["god"] = "Continuously restores health.",
@@ -6472,6 +6567,323 @@ table.insert(genv.connections, infiniteJumpConnection)
 -- =========================================
 -- END OF ULTIMATE COMMANDS
 -- =========================================
+
+-- ==========================================
+-- QUIRKYCMD SUKUNA EDITION V3
+-- ==========================================
+
+local sukunaFolder = Instance.new("Folder")
+sukunaFolder.Name = "QuirkySukunaEffects"
+sukunaFolder.Parent = workspace
+
+local sukunaDomain = nil
+local sukunaDomainConnection = nil
+
+local function sukunaTween(object, duration, properties)
+    local tween = TweenService:Create(
+        object,
+        TweenInfo.new(duration, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+        properties
+    )
+    tween:Play()
+    return tween
+end
+
+local function sukunaPart(size, cf, color, transparency)
+    local part = Instance.new("Part")
+    part.Anchored = true
+    part.CanCollide = false
+    part.CanTouch = false
+    part.CanQuery = false
+    part.Material = Enum.Material.Neon
+    part.Color = color
+    part.Transparency = transparency or 0
+    part.Size = size
+    part.CFrame = cf
+    part.Parent = sukunaFolder
+    return part
+end
+
+local function sukunaSlash(origin, direction, width, distance)
+    direction = direction.Unit
+
+    local red = Color3.fromRGB(255, 20, 35)
+    local darkRed = Color3.fromRGB(95, 0, 10)
+
+    local slash = sukunaPart(
+        Vector3.new(width, 0.35, 3),
+        CFrame.lookAt(origin, origin + direction),
+        red,
+        0.1
+    )
+
+    slash.CFrame = slash.CFrame * CFrame.Angles(
+        0,
+        0,
+        math.rad(25)
+    )
+
+    local glow = sukunaPart(
+        Vector3.new(width * 1.2, 1.2, 3),
+        slash.CFrame,
+        darkRed,
+        0.65
+    )
+
+    local light = Instance.new("PointLight")
+    light.Color = red
+    light.Brightness = 5
+    light.Range = width * 2
+    light.Parent = slash
+
+    local startCF = slash.CFrame
+    local goalCF = startCF + direction * distance
+
+    sukunaTween(slash, 0.5, {
+        CFrame = goalCF,
+        Transparency = 1
+    })
+
+    sukunaTween(glow, 0.5, {
+        CFrame = goalCF,
+        Transparency = 1
+    })
+
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Exclude
+    rayParams.FilterDescendantsInstances = {
+        localPlayer.Character,
+        sukunaFolder
+    }
+
+    task.spawn(function()
+        local steps = math.max(1, math.floor(distance / 3))
+
+        for i = 1, steps do
+            local position = origin + direction * (distance * i / steps)
+
+            local parts = workspace:GetPartBoundsInBox(
+                CFrame.lookAt(position, position + direction),
+                Vector3.new(width, width, 5),
+                OverlapParams.new()
+            )
+
+            for _, part in ipairs(parts) do
+                if not part:IsDescendantOf(sukunaFolder)
+                    and not (
+                        localPlayer.Character
+                        and part:IsDescendantOf(localPlayer.Character)
+                    ) then
+
+                    local model = part:FindFirstAncestorOfClass("Model")
+                    local hum = model and model:FindFirstChildOfClass("Humanoid")
+
+                    if hum and hum.Health > 0 then
+                        hum:TakeDamage(100)
+                    elseif not part.Anchored and part.Size.Magnitude < 80 then
+                        part:Destroy()
+                    end
+                end
+            end
+
+            task.wait()
+        end
+    end)
+
+    task.delay(0.65, function()
+        if slash then slash:Destroy() end
+        if glow then glow:Destroy() end
+    end)
+end
+
+local function sukunaCreateTool(name, width, distance, color)
+    local backpack = localPlayer:FindFirstChildOfClass("Backpack")
+    if not backpack then return end
+
+    if backpack:FindFirstChild(name) then
+        return
+    end
+
+    local tool = Instance.new("Tool")
+    tool.Name = name
+    tool.RequiresHandle = false
+    tool.CanBeDropped = false
+    tool.ToolTip = "Sukuna Ability - Unlimited Uses"
+    tool.Parent = backpack
+
+    local slashSound = Instance.new("Sound")
+    slashSound.SoundId = "rbxassetid://12222216"
+    slashSound.Volume = 1
+    slashSound.PlaybackSpeed = 0.8
+    slashSound.Parent = tool
+
+    tool.Activated:Connect(function()
+        local char = localPlayer.Character
+        if not char then return end
+
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+
+        local direction = root.CFrame.LookVector
+        local origin = root.Position + direction * 5
+
+        slashSound:Play()
+
+        sukunaSlash(
+            origin,
+            direction,
+            width,
+            distance
+        )
+    end)
+end
+
+addCommand("sukunacut", function()
+    sukunaCreateTool(
+        "SukunaCut",
+        12,
+        100,
+        Color3.fromRGB(255, 20, 35)
+    )
+
+    notify(
+        "Sukuna",
+        "SukunaCut equipped!",
+        3
+    )
+end, {"cleave"}, 3)
+
+addCommand("sukunaworldcut", function()
+    sukunaCreateTool(
+        "SukunaWorldCut",
+        35,
+        250,
+        Color3.fromRGB(255, 0, 0)
+    )
+
+    notify(
+        "Sukuna",
+        "World Cutting Slash equipped!",
+        3
+    )
+end, {"worldslash", "worldcut"}, 3)
+
+local function sukunaRemoveDomain()
+    if sukunaDomainConnection then
+        sukunaDomainConnection:Disconnect()
+        sukunaDomainConnection = nil
+    end
+
+    if sukunaDomain then
+        sukunaDomain:Destroy()
+        sukunaDomain = nil
+    end
+end
+
+addCommand("domainexpansion", function()
+    if sukunaDomain then
+        sukunaRemoveDomain()
+        notify("Domain Expansion", "Domain closed.", 3)
+        return
+    end
+
+    local char = localPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+
+    if not root then return end
+
+    local center = root.Position
+    local radius = 150
+
+    local sphere = sukunaPart(
+        Vector3.new(1, 1, 1),
+        CFrame.new(center),
+        Color3.fromRGB(5, 0, 0),
+        0.2
+    )
+
+    sphere.Shape = Enum.PartType.Ball
+    sphere.Material = Enum.Material.SmoothPlastic
+    sphere.Name = "MalevolentShrine"
+
+    sukunaDomain = sphere
+
+    sukunaTween(sphere, 1.5, {
+        Size = Vector3.new(radius * 2, radius * 2, radius * 2),
+        Transparency = 0.1
+    })
+
+    local domainLight = Instance.new("PointLight")
+    domainLight.Color = Color3.fromRGB(255, 0, 0)
+    domainLight.Brightness = 8
+    domainLight.Range = 100
+    domainLight.Parent = sphere
+
+    for i = 1, 24 do
+        local angle = math.rad(i * 15)
+
+        local direction = Vector3.new(
+            math.cos(angle),
+            0,
+            math.sin(angle)
+        )
+
+        local beam = sukunaPart(
+            Vector3.new(2, 2, radius),
+            CFrame.lookAt(
+                center + direction * (radius / 2),
+                center + direction * radius
+            ),
+            Color3.fromRGB(255, 0, 0),
+            0.5
+        )
+
+        sukunaTween(beam, 1.5, {
+            Transparency = 1
+        })
+
+        task.delay(1.6, function()
+            beam:Destroy()
+        end)
+    end
+
+    sukunaDomainConnection = rs.Heartbeat:Connect(function()
+        if not sukunaDomain or not sukunaDomain.Parent then
+            return
+        end
+
+        local centerPosition = sukunaDomain.Position
+
+        for _, player in ipairs(players:GetPlayers()) do
+            if player == localPlayer then continue end
+
+            local targetChar = player.Character
+            local hum = targetChar and targetChar:FindFirstChildOfClass("Humanoid")
+            local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+
+            if hum and targetRoot then
+                local distance = (targetRoot.Position - centerPosition).Magnitude
+
+                if distance <= radius then
+                    hum.WalkSpeed = 0
+                    hum.JumpPower = 0
+                end
+            end
+        end
+    end)
+
+    table.insert(genv.connections, sukunaDomainConnection)
+
+    notify(
+        "Domain Expansion",
+        "MALEVOLENT SHRINE!",
+        5
+    )
+end, {"domain", "shrine"}, 3)
+
+-- ==========================================
+-- END SUKUNA EDITION
+-- ==========================================
 
 table.sort(commands, function(a,b)
 	return a.name < b.name
